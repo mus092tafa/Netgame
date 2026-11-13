@@ -1,0 +1,6 @@
+* text=auto eol=lf
+*.sh text eol=lf
+*.cmd text eol=crlf
+netgame text eol=lf
+bin/netgame.mjs text eol=lf
+docker/machine/svc text eol=lf

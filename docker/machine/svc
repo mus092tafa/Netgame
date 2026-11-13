@@ -1,0 +1,21 @@
+#!/bin/bash
+# Tiny stand-in for systemctl (containers have no systemd): systemctl start|stop|restart|status <name>
+action="$1"; name="${2%.service}"
+[ "$(id -u)" = 0 ] || exec sudo /usr/local/bin/svc "$@"
+case "$name" in
+  sshd|ssh)   start() { /usr/sbin/sshd; };                 stop() { pkill -x sshd -o; };  pat='sshd: /usr/sbin/sshd' ;;
+  nginx)      start() { nginx; };                          stop() { nginx -s stop; };     pat='nginx: master' ;;
+  postgres|postgresql)
+              start() { pg_ctlcluster 15 main start; };    stop() { pg_ctlcluster 15 main stop; }; pat='postgres -D' ;;
+  dnsmasq)    start() { dnsmasq; };                        stop() { pkill -x dnsmasq; };  pat='^dnsmasq' ;;
+  *) echo "Failed to $action $name.service: Unit $name.service not found."; exit 5 ;;
+esac
+running() { pgrep -f "$pat" >/dev/null; }
+case "$action" in
+  start)   running || start ;;
+  stop)    running && stop ;;
+  restart) running && stop; sleep 0.5; start ;;
+  status)  if running; then echo "● $name.service - active (running)"; else echo "● $name.service - inactive (dead)"; exit 3; fi ;;
+  *) echo "usage: systemctl start|stop|restart|status <service>"; exit 1 ;;
+esac
+exit 0

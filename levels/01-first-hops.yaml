@@ -1,0 +1,62 @@
+id: 01-first-hops
+title: First hops
+brief: >
+  Your laptop is on the office network. The database lives on a separate backend network
+  that your laptop can't reach directly. web-01 sits in both networks.
+  Make the map look like the dotted lines: SSH into web-01, fetch its web page,
+  then from web-01 connect to the database with `psql -h db-01 -U app`.
+
+networks:
+  - id: office
+    name: office
+    subnet: 10.10.0.0/24
+  - id: backend
+    name: backend
+    subnet: 10.20.0.0/24
+
+machines:
+  - id: laptop
+    kind: laptop
+    user: dev
+    terminal: true
+    networks: { office: 10.10.0.10 }
+
+  - id: dns
+    kind: dns
+    user: root
+    networks: { office: 10.10.0.53 }
+    services:
+      - { name: dnsmasq, port: 53, transport: udp }
+      - { name: dnsmasq, port: 53 }
+
+  - id: web-01
+    kind: server
+    user: dev
+    networks: { office: 10.10.0.20, backend: 10.20.0.20 }
+    services:
+      - { name: sshd, port: 22 }
+      - { name: nginx, port: 80 }
+    firewall:
+      drop: [443, 8443]   # simulator: these ports silently time out
+
+  - id: db-01
+    kind: database
+    user: postgres
+    networks: { backend: 10.20.0.30 }
+    services:
+      - { name: sshd, port: 22 }
+      - { name: postgres, port: 5432 }
+
+target_connections:
+  - from: laptop
+    to: web-01
+    port: 22
+    label: "SSH into web-01"
+  - from: laptop
+    to: web-01
+    port: 80
+    label: "Fetch web-01's home page"
+  - from: web-01
+    to: db-01
+    port: 5432
+    label: "Connect to the database from web-01"

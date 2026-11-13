@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+# Start the network game:  ./netgame   (run `./netgame install` to get a `netgame` command)
+set -e
+SELF="$(readlink -f "${BASH_SOURCE[0]}" 2>/dev/null || echo "${BASH_SOURCE[0]}")"
+DIR="$(cd "$(dirname "$SELF")" && pwd)"
+if ! command -v node >/dev/null 2>&1; then
+  echo "✖ Node.js is not installed (need version 20 or newer)." >&2
+  echo "  Arch/Omarchy:  sudo pacman -S nodejs npm   (or: mise use -g node@lts)" >&2
+  exit 1
+fi
+exec node "$DIR/bin/netgame.mjs" "$@"

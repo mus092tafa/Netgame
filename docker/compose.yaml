@@ -1,0 +1,54 @@
+# Level 01-first-hops as real containers.
+#   docker compose -f docker/compose.yaml up -d --build
+# Container names must match the machine ids in levels/01-first-hops.yaml.
+name: netgame
+
+x-machine: &machine
+  build: ./machine
+  image: netgame/machine:latest
+  init: true
+  labels: &labels
+    netgame.level: 01-first-hops
+
+services:
+  laptop:
+    <<: *machine
+    container_name: laptop
+    hostname: laptop
+    labels: { <<: *labels, netgame.kind: laptop }
+    networks: { office: { ipv4_address: 10.10.0.10 } }
+
+  dns:
+    <<: *machine
+    container_name: dns
+    hostname: dns
+    labels: { <<: *labels, netgame.kind: dns }
+    environment: { SERVICES: dnsmasq }
+    networks: { office: { ipv4_address: 10.10.0.53 } }
+
+  web-01:
+    <<: *machine
+    container_name: web-01
+    hostname: web-01
+    labels: { <<: *labels, netgame.kind: server }
+    environment: { SERVICES: sshd nginx, DROP_PORTS: 443 8443 }
+    cap_add: [NET_ADMIN]
+    networks:
+      office: { ipv4_address: 10.10.0.20 }
+      backend: { ipv4_address: 10.20.0.20 }
+
+  db-01:
+    <<: *machine
+    container_name: db-01
+    hostname: db-01
+    labels: { <<: *labels, netgame.kind: database }
+    environment: { SERVICES: sshd postgres }
+    networks: { backend: { ipv4_address: 10.20.0.30 } }
+
+networks:
+  office:
+    name: netgame-office
+    ipam: { config: [{ subnet: 10.10.0.0/24 }] }
+  backend:
+    name: netgame-backend
+    ipam: { config: [{ subnet: 10.20.0.0/24 }] }

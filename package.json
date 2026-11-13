@@ -1,0 +1,24 @@
+{
+  "name": "network-game",
+  "private": true,
+  "workspaces": [
+    "server",
+    "web"
+  ],
+  "scripts": {
+    "dev": "concurrently -k -n server,web -c green,cyan \"npm:dev -w server\" \"npm:dev -w web\"",
+    "test": "npm test -w server",
+    "typecheck": "npm run typecheck -w server && npm run typecheck -w web",
+    "dev:docker": "concurrently -k -n server,web -c green,cyan \"npm:dev:docker -w server\" \"npm:dev -w web\"",
+    "docker:up": "docker compose -f docker/compose.yaml up -d --build",
+    "docker:down": "docker compose -f docker/compose.yaml down",
+    "start": "node bin/netgame.mjs",
+    "build": "npm run build -w web"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  },
+  "bin": {
+    "netgame": "bin/netgame.mjs"
+  }
+}
