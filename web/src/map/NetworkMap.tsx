@@ -124,11 +124,13 @@ export function NetworkMap({ state, activeTab, theme, onToggleTheme, onFocusMach
     setView({ k, x: padL + W / 2 - (b.x + b.w / 2) * k, y: padT + H / 2 - (b.y + b.h / 2) * k });
   }, [zRects, nodes, pos, sizeOf, state.targets.length]);
 
+  // Fit once per level, and again if machines or zones show up later (e.g. Docker still starting).
+  const fitKey = `${levelId}:${nodes.length}:${state.zones.length}`;
   useEffect(() => {
-    if (fitted.current === levelId || !nodes.length || Object.keys(sizes).length < nodes.length) return;
-    fitted.current = levelId;
+    if (fitted.current === fitKey || !nodes.length || Object.keys(sizes).length < nodes.length) return;
+    fitted.current = fitKey;
     fit();
-  }, [levelId, nodes.length, sizes, fit]);
+  }, [fitKey, nodes.length, sizes, fit]);
 
   const zoomAt = useCallback((factor: number, cx?: number, cy?: number) => {
     const el = viewport.current;

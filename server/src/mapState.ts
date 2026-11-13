@@ -18,6 +18,8 @@ export class MapState {
   constructor(private emit: (msg: ServerMsg) => void) {}
 
   setNodes(zones: Zone[], nodes: MapNode[]) {
+    // Clients that connected before the first poll got no zones; send them when they appear or change.
+    if (JSON.stringify(zones) !== JSON.stringify(this.zones)) this.emit({ type: 'zones', zones });
     this.zones = zones;
     const seen = new Set<string>();
     for (const n of nodes) {

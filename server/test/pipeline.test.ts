@@ -204,6 +204,15 @@ describe('simulator end to end', () => {
     expect(await reasons('ping -c 1 10.20.0.30')).toEqual(['no-route']);
   });
 
+  it('sends zones once they are known (clients may connect before the first poll)', async () => {
+    const level = loadLevel(resolve(__dirname, '../../levels/01-first-hops.yaml'));
+    const msgs: ServerMsg[] = [];
+    const engine = new Engine(level, new SimSource(level), (m) => msgs.push(m));
+    expect((engine.snapshot() as Extract<ServerMsg, { type: 'snapshot' }>).zones).toEqual([]);
+    await engine.poll();
+    expect(msgs.find((m) => m.type === 'zones')).toMatchObject({ zones: [{ id: 'office' }, { id: 'backend' }] });
+  });
+
   it('stopping nginx removes the port badge', async () => {
     const { engine, run } = await setup();
     await run('ssh web-01');

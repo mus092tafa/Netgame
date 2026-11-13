@@ -113,6 +113,7 @@ export type ServerMsg =
       shells: ShellInfo[];
       mode: 'sim' | 'docker';
     }
+  | { type: 'zones'; zones: Zone[] }
   | { type: 'node'; node: MapNode }
   | { type: 'node-removed'; id: string }
   | { type: 'edge-open'; edge: MapEdge }

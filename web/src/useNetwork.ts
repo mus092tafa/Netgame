@@ -134,11 +134,12 @@ export function useNetwork() {
             msg.edges.forEach(achieve);
             break;
           }
-          case 'node': {
-            s.nodes = new Map(s.nodes).set(msg.node.id, msg.node);
-            if (!s.zones.length) break;
+          case 'zones':
+            s.zones = msg.zones;
             break;
-          }
+          case 'node':
+            s.nodes = new Map(s.nodes).set(msg.node.id, msg.node);
+            break;
           case 'node-removed': {
             s.nodes = new Map(s.nodes);
             s.nodes.delete(msg.id);
