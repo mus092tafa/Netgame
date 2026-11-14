@@ -1,6 +1,7 @@
 // Builds every line on the map (live edges, goals, failures, pings, DNS) and draws them.
 import type { MapEvent, ServiceCategory, ShellInfo, TargetConnection } from '../../../shared/protocol.ts';
 import { lookupService } from '../../../shared/services.ts';
+import { edgeGoals } from '../../../shared/goals.ts';
 import type { Transient, ViewEdge } from '../useNetwork.ts';
 import { segment, type Pt, type Size } from './layout.ts';
 
@@ -47,9 +48,7 @@ export function buildLines(
 
   for (const e of edges.values()) {
     if (!e.client.machine || !e.server.machine) continue;
-    const goals = targets
-      .map((t, i) => (t.from === e.client.machine && t.to === e.server.machine && t.port === e.server.port ? i : -1))
-      .filter((i) => i >= 0);
+    const goals = edgeGoals(targets, e);
     goals.forEach((i) => !e.closingAt && liveGoal.add(i));
     items.push({
       key: `edge:${e.id}`,
@@ -65,16 +64,24 @@ export function buildLines(
     });
   }
 
+  // Only the next goal is drawn (plus one just reached, for its burst), so the map doesn't fill up with dotted lines.
+  const next = targets.findIndex((_, i) => !achieved.has(i));
   targets.forEach((t, i) => {
+    if (i !== next && !justAchieved.has(i)) return;
     if (liveGoal.has(i)) return; // the real line is drawn instead
-    const svc = lookupService(t.port);
+    const svc = lookupService(t.port ?? 0);
+    const kind = t.kind ?? 'connect';
     items.push({
       key: `target:${i}`,
       a: t.from,
       b: t.to,
       kind: 'target',
-      cat: svc.category,
-      label: `:${t.port} ${svc.name}`,
+      cat: kind === 'ping' ? 'icmp' : kind === 'connect' ? svc.category : 'fail',
+      label:
+        kind === 'ping' ? 'ICMP · ping'
+        : kind === 'refused' ? `:${t.port} refused?`
+        : kind === 'timeout' ? `:${t.port} blocked?`
+        : `:${t.port} ${svc.name}`,
       target: { t, i, achieved: achieved.has(i), just: justAchieved.has(i) },
     });
   });

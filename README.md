@@ -121,7 +121,9 @@ npm test           # parser / correlator / command-log / simulator tests
 | `server/src/sources/sim.ts` | Simulator: fake machines that print real `ss` text and realistic tool output |
 | `server/src/tutor.ts` | Placeholder rule-based tutor; replace `explain()` with the real tutor |
 | `web/src/map/*` | The map: zones, cards, lines, port flags, tooltips, ghosts, goals, pan/zoom |
-| `levels/*.yaml` | Level topology + `target_connections` |
+| `shared/commandHelp.ts` | Explains a command part by part (options, arguments, why they're there) for the tutor and goals |
+| `shared/goals.ts` | Which goals a connection, ping or failed attempt reaches |
+| `levels/*.yaml` | Level topology + `target_connections` (goals: `kind` connect/ping/refused/timeout, `command` to suggest) |
 
 ## Docker mode
 

@@ -78,11 +78,20 @@ export type MapEvent =
   | { kind: 'ping'; id: string; at: number; from: string; to: string; ok: boolean; command: string }
   | { kind: 'dns'; id: string; at: number; from: string; to: string; name: string; ok: boolean };
 
+/** A goal of the level. */
 export interface TargetConnection {
   from: string;
   to: string;
-  port: number;
+  /** Not used for 'ping' (ICMP has no ports). */
+  port?: number;
+  /**
+   * What reaches it: a working connection (default), a ping that gets replies,
+   * or an attempt that fails in a particular way (to learn what each failure looks like).
+   */
+  kind?: 'connect' | 'ping' | 'refused' | 'timeout';
   label: string;
+  /** A command that does it, typed on `from`. The goals panel can explain each part of it. */
+  command?: string;
 }
 
 /** Terminal tab (a shell rooted on one machine, possibly hopped elsewhere through ssh). */

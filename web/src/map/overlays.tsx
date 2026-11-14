@@ -125,22 +125,45 @@ export function Legend() {
   );
 }
 
-export function Objectives({ targets, achieved, name }: { targets: TargetConnection[]; achieved: Set<number>; name: (id: string) => string }) {
+function goalSub(t: TargetConnection, name: (id: string) => string) {
+  const route = `${name(t.from)} → ${name(t.to)}`;
+  switch (t.kind ?? 'connect') {
+    case 'ping': return `${route} · ICMP, no port`;
+    case 'refused': return `${route} :${t.port} · gets refused`;
+    case 'timeout': return `${route} :${t.port} · gets no answer`;
+    default: return `${route} :${t.port}`;
+  }
+}
+
+export function Objectives({ targets, achieved, name, onExplainCommand }: {
+  targets: TargetConnection[];
+  achieved: Set<number>;
+  name: (id: string) => string;
+  onExplainCommand: (command: string) => void;
+}) {
   if (!targets.length) return null;
+  const next = targets.findIndex((_, i) => !achieved.has(i));
   return (
-    <div className="objectives panel-box">
+    <div className="objectives panel-box" onPointerDown={(e) => e.stopPropagation()}>
       <div className="box-title">
         GOALS <span className="muted">{achieved.size}/{targets.length}</span>
       </div>
       {targets.map((t, i) => (
-        <div key={i} className={`goal ${achieved.has(i) ? 'done' : ''}`}>
+        <div key={i} className={`goal ${achieved.has(i) ? 'done' : ''} ${i === next ? 'next' : ''}`}>
           <span className="goal-box">{achieved.has(i) ? '✓' : ''}</span>
           <span>
             {t.label}
-            <span className="goal-sub">{name(t.from)} → {name(t.to)} :{t.port}</span>
+            <span className="goal-sub">{goalSub(t, name)}</span>
+            {i === next && t.command && (
+              <span className="goal-cmd">
+                <span className="muted">on {name(t.from)}:</span> <code>{t.command}</code>
+                <button className="chip" onClick={() => onExplainCommand(t.command!)}>What does it mean?</button>
+              </span>
+            )}
           </span>
         </div>
       ))}
+      {next < 0 && <div className="goal-sub">All goals reached. Keep exploring: every command works.</div>}
     </div>
   );
 }

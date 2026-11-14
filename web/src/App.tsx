@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { explainCommand, formatCommandHelp } from '../../shared/commandHelp.ts';
 import { NetworkMap } from './map/NetworkMap.tsx';
 import { ConnectionLog } from './panels/ConnectionLog.tsx';
 import { Terminal } from './panels/Terminal.tsx';
@@ -43,7 +44,7 @@ function Splitter({ dir, onDrag }: { dir: 'col' | 'row'; onDrag: (delta: number)
 }
 
 export function App() {
-  const { state, send, term, askTutor } = useNetwork();
+  const { state, send, term, askTutor, tutorSay } = useNetwork();
   const [theme, setTheme] = useState<'dark' | 'light'>(() => readPref('netgame.theme', 'dark'));
   const [sizes, setSizes] = useState(() => readPref('netgame.panels', { side: 440, tutor: 260, log: 190 }));
   const [activeTab, setActiveTab] = useState<string | null>(null);
@@ -94,6 +95,10 @@ export function App() {
             onToggleTheme={() => setTheme((t) => (t === 'dark' ? 'light' : 'dark'))}
             onFocusMachine={focusMachine}
             onExplain={askTutor}
+            onExplainCommand={(cmd) => {
+              const help = explainCommand(cmd);
+              if (help) tutorSay(`What does \`${cmd}\` mean?`, formatCommandHelp(cmd, help));
+            }}
           />
           <Splitter dir="row" onDrag={(d) => resize('log', -d, 60, 500)} />
           <ConnectionLog rows={state.log} start={start} />

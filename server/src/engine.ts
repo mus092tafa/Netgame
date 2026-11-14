@@ -1,4 +1,5 @@
 // Polling loop: topology + `ss` from every machine → correlated edges → diffs.
+import { explainCommand, formatCommandHelp } from '../../shared/commandHelp.ts';
 import type { ClientMsg, MapNode, ServerMsg } from '../../shared/protocol.ts';
 import { processCommandLog } from './commandLog.ts';
 import { correlate, listeningPorts } from './correlate.ts';
@@ -19,6 +20,8 @@ export class Engine {
   private timer?: NodeJS.Timeout;
   /** Real shells (Docker mode). When set, it replaces the line-based `shell`. */
   private pty: DockerTerminals | null = null;
+  /** Command signatures (tool + options) the tutor already explained. */
+  private explained = new Set<string>();
 
   constructor(
     private level: Level,
@@ -74,7 +77,10 @@ export class Engine {
 
   /** A real shell finished a command or changed machine: update the map right away. */
   async terminalActivity(cmd?: { machine: string; line: string; output: string; exitCode: number }) {
-    if (cmd) this.ingestCommand(cmd);
+    if (cmd) {
+      this.ingestCommand(cmd);
+      this.explainOnce(cmd.line);
+    }
     await this.poll();
     this.broadcast({ type: 'shells', shells: this.shells() });
   }
@@ -122,12 +128,21 @@ export class Engine {
     for (const e of res.oneShotEdges) this.state.addOneShot(e);
   }
 
+  /** The first time a tool is used with a given set of options, the tutor explains each part. */
+  explainOnce(line: string) {
+    const help = explainCommand(line);
+    if (!help || this.explained.has(help.signature)) return;
+    this.explained.add(help.signature);
+    this.broadcast({ type: 'tutor', text: formatCommandHelp(line, help) });
+  }
+
   async handle(msg: ClientMsg, reply: (m: ServerMsg) => void) {
     switch (msg.type) {
       case 'cmd': {
         if (!this.shell) return;
         const r = await this.shell.run(msg.tab, msg.line);
         this.broadcast({ type: 'term', tab: msg.tab, text: r.output });
+        this.explainOnce(msg.line);
         if (r.log) this.ingestCommand({ machine: r.machine, line: msg.line, output: r.output, exitCode: r.exitCode });
         await this.poll(); // don't wait for the next tick: the map should react right away
         this.broadcast({ type: 'shells', shells: this.shell.shells() });

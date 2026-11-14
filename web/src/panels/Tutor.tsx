@@ -1,20 +1,33 @@
 import { Fragment, useEffect, useRef } from 'react';
 import type { TutorMsg } from '../useNetwork.ts';
 
-/** Tiny markdown: **bold**, `code`, paragraphs. */
+function Inline({ text }: { text: string }) {
+  return (
+    <>
+      {text.split(/(\*\*[^*]+\*\*|`[^`]+`|\*[^*]+\*)/).map((part, j) => {
+        if (part.startsWith('**')) return <b key={j}>{part.slice(2, -2)}</b>;
+        if (part.startsWith('`')) return <code key={j}>{part.slice(1, -1)}</code>;
+        if (part.startsWith('*') && part.length > 2) return <i key={j}>{part.slice(1, -1)}</i>;
+        return <Fragment key={j}>{part}</Fragment>;
+      })}
+    </>
+  );
+}
+
+/** Tiny markdown: **bold**, `code`, *italic*, paragraphs, and "- " lists. */
 function Rich({ text }: { text: string }) {
   return (
     <>
-      {text.split(/\n\n+/).map((para, i) => (
-        <p key={i}>
-          {para.split(/(\*\*[^*]+\*\*|`[^`]+`|\*[^*]+\*)/).map((part, j) => {
-            if (part.startsWith('**')) return <b key={j}>{part.slice(2, -2)}</b>;
-            if (part.startsWith('`')) return <code key={j}>{part.slice(1, -1)}</code>;
-            if (part.startsWith('*') && part.length > 2) return <i key={j}>{part.slice(1, -1)}</i>;
-            return <Fragment key={j}>{part}</Fragment>;
-          })}
-        </p>
-      ))}
+      {text.split(/\n\n+/).map((para, i) => {
+        const lines = para.split('\n');
+        if (lines.every((l) => l.startsWith('- ')))
+          return (
+            <ul key={i}>
+              {lines.map((l, j) => <li key={j}><Inline text={l.slice(2)} /></li>)}
+            </ul>
+          );
+        return <p key={i}><Inline text={para} /></p>;
+      })}
     </>
   );
 }

@@ -1,6 +1,7 @@
 // WebSocket client + map store. Applies the backend's diffs and keeps short-lived visuals
 // (fading edges, failed attempts, pings, DNS flashes) alive for their display time.
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { edgeGoals, eventGoals } from '../../shared/goals.ts';
 import type {
   ClientMsg, LevelInfo, MapEdge, MapEvent, MapNode, ServerMsg, ShellInfo, TargetConnection, Zone,
 } from '../../shared/protocol.ts';
@@ -70,6 +71,7 @@ const initial = (): NetState => ({
 });
 
 let rowSeq = 0;
+let tutorSeq = 1;
 
 const TERM_KEEP = 256 * 1024;
 
@@ -101,12 +103,6 @@ function host(s: NetState, id: string | null, ip: string) {
   return id ? s.nodes.get(id)?.hostname ?? id : ip;
 }
 
-function matchTargets(s: NetState, e: MapEdge): number[] {
-  return s.targets
-    .map((t, i) => (t.from === e.client.machine && t.to === e.server.machine && t.port === e.server.port ? i : -1))
-    .filter((i) => i >= 0);
-}
-
 export function useNetwork() {
   const [state, setState] = useState<NetState>(initial);
   const wsRef = useRef<WebSocket | null>(null);
@@ -128,8 +124,8 @@ export function useNetwork() {
         const addLog = (row: Omit<LogRow, 'id' | 't'>) => {
           s.log = [...s.log.slice(-199), { ...row, id: ++rowSeq, t: Date.now() }];
         };
-        const achieve = (e: MapEdge) => {
-          const hits = matchTargets(s, e).filter((i) => !s.achieved.has(i));
+        const achieve = (goals: number[]) => {
+          const hits = goals.filter((i) => !s.achieved.has(i));
           if (!hits.length) return;
           s.achieved = new Set([...s.achieved, ...hits]);
           s.justAchieved = new Set([...s.justAchieved, ...hits]);
@@ -158,7 +154,7 @@ export function useNetwork() {
                 ? prev.tutor
                 : [{ id: 1, from: 'tutor', text: `**${msg.level.title}**\n\n${msg.level.brief}\n\n${msg.terminal === 'pty' ? 'The terminal is a real bash shell on your laptop: anything you type runs for real.' : 'Type `help` in the terminal to see what you can do.'} Hover any line on the map, or press "Explain this" on it, and I'll walk you through it.` }],
             });
-            msg.edges.forEach(achieve);
+            msg.edges.forEach((e) => achieve(edgeGoals(s.targets, e)));
             break;
           }
           case 'zones':
@@ -186,7 +182,7 @@ export function useNetwork() {
                 category: e.category,
                 edgeId: e.id,
               });
-              achieve(e);
+              achieve(edgeGoals(s.targets, e));
             }
             break;
           }
@@ -229,6 +225,7 @@ export function useNetwork() {
               }),
             );
             const from = host(s, ev.from, ev.from);
+            const goals = eventGoals(s.targets, ev);
             if (ev.kind === 'failed') {
               const to = ev.to ? host(s, ev.to, ev.target) : ev.target;
               const why = { refused: 'Connection refused', timeout: 'No answer (blocked?)', 'no-route': 'No route to host', 'unknown-host': 'Could not resolve host' }[ev.reason];
@@ -238,6 +235,7 @@ export function useNetwork() {
             } else {
               addLog({ src: from, dst: `${host(s, ev.to, ev.to)}:53`, proto: 'DNS', info: `Query A ${ev.name} → ${ev.ok ? 'answer' : 'NXDOMAIN'}`, category: 'dns', eventId: ev.id });
             }
+            achieve(goals);
             break;
           }
           case 'shells':
@@ -246,7 +244,7 @@ export function useNetwork() {
           case 'term':
             break; // handled outside React state (see onMessage)
           case 'tutor':
-            s.tutor = [...s.tutor, { id: Date.now(), from: 'tutor', text: msg.text }];
+            s.tutor = [...s.tutor, { id: ++tutorSeq, from: 'tutor', text: msg.text }];
             break;
         }
         return s;
@@ -289,11 +287,19 @@ export function useNetwork() {
 
   const askTutor = useCallback(
     (question: string, payload: { edge?: MapEdge; event?: MapEvent }) => {
-      setState((p) => ({ ...p, tutor: [...p.tutor, { id: Date.now(), from: 'you', text: question }] }));
+      setState((p) => ({ ...p, tutor: [...p.tutor, { id: ++tutorSeq, from: 'you', text: question }] }));
       send({ type: 'explain', ...payload });
     },
     [send],
   );
 
-  return { state, send, term, askTutor };
+  /** A question the browser can answer by itself (e.g. what a command means). */
+  const tutorSay = useCallback((question: string, answer: string) => {
+    setState((p) => ({
+      ...p,
+      tutor: [...p.tutor, { id: ++tutorSeq, from: 'you', text: question }, { id: ++tutorSeq, from: 'tutor', text: answer }],
+    }));
+  }, []);
+
+  return { state, send, term, askTutor, tutorSay };
 }

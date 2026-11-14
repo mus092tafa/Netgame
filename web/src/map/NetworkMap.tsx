@@ -13,6 +13,7 @@ interface Props {
   onToggleTheme: () => void;
   onFocusMachine: (id: string) => void;
   onExplain: (question: string, payload: { edge?: MapEdge; event?: MapEvent }) => void;
+  onExplainCommand: (command: string) => void;
 }
 
 const GHOST: Size = { w: 120, h: 64 };
@@ -37,7 +38,7 @@ type Drag =
   | { kind: 'pan'; sx: number; sy: number; vx: number; vy: number }
   | { kind: 'node'; id: string; sx: number; sy: number; nx: number; ny: number; moved: boolean };
 
-export function NetworkMap({ state, activeTab, theme, onToggleTheme, onFocusMachine, onExplain }: Props) {
+export function NetworkMap({ state, activeTab, theme, onToggleTheme, onFocusMachine, onExplain, onExplainCommand }: Props) {
   const levelId = state.level?.id ?? 'none';
   const nodes = useMemo(() => [...state.nodes.values()], [state.nodes]);
   const [saved, setSaved] = useState<Record<string, Pt>>({});
@@ -343,7 +344,7 @@ export function NetworkMap({ state, activeTab, theme, onToggleTheme, onFocusMach
         )}
 
         <Legend />
-        <Objectives targets={state.targets} achieved={state.achieved} name={(id) => name(id)} />
+        <Objectives targets={state.targets} achieved={state.achieved} name={(id) => name(id)} onExplainCommand={onExplainCommand} />
         {selNode && (
           <DetailsPanel
             node={selNode}
