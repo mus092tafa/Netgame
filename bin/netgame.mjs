@@ -122,6 +122,13 @@ function compose(state, args, visible = true) {
   return visible ? runVisible(cmd, full) : run(cmd, full);
 }
 
+/** True when docker/machine/ changed after the image was built (e.g. after `git pull`). */
+function imageOutdated() {
+  const r = run('docker', ['image', 'inspect', '--format', '{{.Created}}', 'netgame/machine:latest']);
+  if (r.status !== 0) return false; // not built yet: compose builds it anyway
+  return newestMtime(join(ROOT, 'docker', 'machine')) > Date.parse(r.stdout.trim());
+}
+
 function containersUp() {
   const r = run('docker', ['ps', '--filter', 'label=netgame.level', '--format', '{{.Names}}']);
   return r.status === 0 ? r.stdout.split(/\s+/).filter(Boolean) : [];
@@ -180,7 +187,10 @@ async function start(opts) {
   if (mode === 'docker') {
     step('Starting the machines in Docker (the first time builds the image, a few minutes)…');
     const args = ['up', '-d', '--remove-orphans'];
-    if (opts.rebuild) args.push('--build');
+    if (opts.rebuild || imageOutdated()) {
+      if (!opts.rebuild) step('The machine image is out of date, rebuilding it…');
+      args.push('--build');
+    }
     if (!compose(docker, args)) fail('Starting the Docker machines failed (see the output above).');
     ok(`Machines running: ${containersUp().join(', ')}`);
   }

@@ -112,6 +112,8 @@ export type ServerMsg =
       targets: TargetConnection[];
       shells: ShellInfo[];
       mode: 'sim' | 'docker';
+      /** 'pty': a real shell, send keystrokes (term-input). 'line': the simulator, send whole lines (cmd). */
+      terminal: 'pty' | 'line';
     }
   | { type: 'zones'; zones: Zone[] }
   | { type: 'node'; node: MapNode }
@@ -121,12 +123,16 @@ export type ServerMsg =
   | { type: 'edge-close'; id: string }
   | { type: 'event'; event: MapEvent }
   | { type: 'shells'; shells: ShellInfo[] }
-  | { type: 'term'; tab: string; text: string }
+  /** Terminal output. `replay` = the recent history of a real shell, sent on connect (replaces the screen). */
+  | { type: 'term'; tab: string; text: string; replay?: boolean }
   | { type: 'tutor'; text: string };
 
 export type ClientMsg =
   | { type: 'cmd'; tab: string; line: string }
+  /** Keystrokes / pasted text for a real shell. */
+  | { type: 'term-input'; tab: string; data: string }
+  | { type: 'term-resize'; tab: string; cols: number; rows: number }
   /** Ask the tutor about a connection (payload is what the map tooltip shows). */
   | { type: 'explain'; edge?: MapEdge; event?: MapEvent }
-  /** For a real terminal backend: report a finished command so failures reach the map. */
+  /** For an external terminal backend: report a finished command so failures reach the map. */
   | { type: 'cmd-log'; machine: string; line: string; output: string; exitCode: number };

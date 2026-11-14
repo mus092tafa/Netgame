@@ -4,6 +4,7 @@ import { processCommandLog } from './commandLog.ts';
 import { correlate, listeningPorts } from './correlate.ts';
 import type { Level } from './level.ts';
 import { MapState } from './mapState.ts';
+import type { DockerTerminals } from './sources/dockerTerminal.ts';
 import type { MachineSource } from './sources/source.ts';
 import { SimSource, type ShellRunner } from './sources/sim.ts';
 import { parseSs } from './ssParser.ts';
@@ -16,6 +17,8 @@ export class Engine {
   private seq = 0;
   private polling = false;
   private timer?: NodeJS.Timeout;
+  /** Real shells (Docker mode). When set, it replaces the line-based `shell`. */
+  private pty: DockerTerminals | null = null;
 
   constructor(
     private level: Level,
@@ -54,8 +57,26 @@ export class Engine {
     }
   }
 
-  setShell(shell: ShellRunner) {
-    this.shell = shell;
+  setTerminals(pty: DockerTerminals) {
+    this.pty = pty;
+  }
+
+  shells() {
+    return (this.pty ?? this.shell)?.shells() ?? [];
+  }
+
+  /** What a browser gets right after the snapshot: the recent output of each real shell. */
+  greet(): ServerMsg[] {
+    if (!this.pty) return [];
+    this.pty.ensure();
+    return this.pty.replay().map(({ tab, text }) => ({ type: 'term', tab, text, replay: true }));
+  }
+
+  /** A real shell finished a command or changed machine: update the map right away. */
+  async terminalActivity(cmd?: { machine: string; line: string; output: string; exitCode: number }) {
+    if (cmd) this.ingestCommand(cmd);
+    await this.poll();
+    this.broadcast({ type: 'shells', shells: this.shells() });
   }
 
   lookup(name: string): string | null {
@@ -80,8 +101,9 @@ export class Engine {
       nodes: [...this.state.nodes.values()],
       edges: this.state.allEdges(),
       targets: this.level.target_connections ?? [],
-      shells: this.shell?.shells() ?? [],
+      shells: this.shells(),
       mode: this.source.mode,
+      terminal: this.pty ? 'pty' : 'line',
     };
   }
 
@@ -111,6 +133,12 @@ export class Engine {
         this.broadcast({ type: 'shells', shells: this.shell.shells() });
         return;
       }
+      case 'term-input':
+        this.pty?.input(msg.tab, msg.data);
+        return;
+      case 'term-resize':
+        this.pty?.resize(msg.tab, msg.cols, msg.rows);
+        return;
       case 'cmd-log':
         this.ingestCommand(msg);
         return;

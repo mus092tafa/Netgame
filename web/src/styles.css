@@ -319,11 +319,9 @@ svg.lines { position: absolute; left: 0; top: 0; overflow: visible; pointer-even
 .terminal .tabs { display: flex; gap: 4px; font-weight: 400; letter-spacing: 0; overflow-x: auto; }
 .tab { background: transparent; border: 1px solid var(--line); border-radius: 3px; padding: 2px 8px; font-size: 11px; }
 .tab.on { border-color: var(--c-ssh); color: var(--c-ssh); }
-.term-body { flex: 1; overflow: auto; padding: 10px 12px; background: var(--bg); font-size: 12.5px; cursor: text; }
-.term-body pre { margin: 0; white-space: pre-wrap; word-break: break-word; font: inherit; }
-.term-line { display: flex; }
-.prompt { color: var(--c-ssh); white-space: pre; }
-.term-line input { flex: 1; background: transparent; border: 0; outline: none; color: var(--text); font: inherit; padding: 0; }
+.term-body { flex: 1; min-height: 0; overflow: hidden; padding: 8px 4px 4px 10px; background: var(--bg); font-size: 12.5px; }
+.term-body.muted { padding: 10px 12px; }
+.term-body .xterm { height: 100%; }
 .chips { display: flex; flex-wrap: wrap; gap: 4px; padding: 6px 8px; border-top: 1px solid var(--line); }
 .chip { background: var(--panel-2); border: 1px solid var(--line); border-radius: 10px; padding: 1px 8px; font-size: 10.5px; color: var(--muted); }
 .chip:hover { color: var(--text); border-color: var(--accent); }

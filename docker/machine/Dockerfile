@@ -22,7 +22,10 @@ RUN useradd -m -s /bin/bash dev \
 
 COPY nginx.conf /etc/nginx/conf.d/netgame.conf
 COPY entrypoint.sh svc /usr/local/bin/
+# Shell hook that reports each command to the game server (see netgame-shell.sh).
+COPY netgame-shell.sh /etc/netgame-shell.sh
 RUN chmod +x /usr/local/bin/entrypoint.sh /usr/local/bin/svc \
- && ln -sf /usr/local/bin/svc /usr/local/bin/systemctl
+ && ln -sf /usr/local/bin/svc /usr/local/bin/systemctl \
+ && echo '. /etc/netgame-shell.sh' >> /etc/bash.bashrc
 
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]

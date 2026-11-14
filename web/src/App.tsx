@@ -43,7 +43,7 @@ function Splitter({ dir, onDrag }: { dir: 'col' | 'row'; onDrag: (delta: number)
 }
 
 export function App() {
-  const { state, send, echo, askTutor } = useNetwork();
+  const { state, send, term, askTutor } = useNetwork();
   const [theme, setTheme] = useState<'dark' | 'light'>(() => readPref('netgame.theme', 'dark'));
   const [sizes, setSizes] = useState(() => readPref('netgame.panels', { side: 440, tutor: 260, log: 190 }));
   const [activeTab, setActiveTab] = useState<string | null>(null);
@@ -104,12 +104,10 @@ export function App() {
             shells={state.shells}
             active={activeTab}
             onActive={setActiveTab}
-            output={state.term}
-            mode={state.mode}
-            onRun={(tab, prompt, line) => {
-              echo(tab, prompt, line);
-              send({ type: 'cmd', tab, line });
-            }}
+            mode={state.terminal}
+            bus={term}
+            theme={theme}
+            send={send}
           />
           <Splitter dir="row" onDrag={(d) => resize('tutor', -d, 80, 700)} />
           <Tutor messages={state.tutor} />

@@ -35,6 +35,7 @@ export interface TutorMsg {
 export interface NetState {
   connected: boolean;
   mode: 'sim' | 'docker' | null;
+  terminal: 'pty' | 'line' | null;
   level: LevelInfo | null;
   zones: Zone[];
   nodes: Map<string, MapNode>;
@@ -44,7 +45,6 @@ export interface NetState {
   achieved: Set<number>;
   justAchieved: Set<number>;
   shells: ShellInfo[];
-  term: Record<string, string>;
   log: LogRow[];
   tutor: TutorMsg[];
 }
@@ -55,6 +55,7 @@ const EVENT_MS: Record<MapEvent['kind'], number> = { failed: 5000, ping: 2600, d
 const initial = (): NetState => ({
   connected: false,
   mode: null,
+  terminal: null,
   level: null,
   zones: [],
   nodes: new Map(),
@@ -64,12 +65,37 @@ const initial = (): NetState => ({
   achieved: new Set(),
   justAchieved: new Set(),
   shells: [],
-  term: {},
   log: [],
   tutor: [],
 });
 
 let rowSeq = 0;
+
+const TERM_KEEP = 256 * 1024;
+
+/**
+ * Terminal output lives outside React state: it goes straight to xterm.js, and each tab keeps
+ * a capped copy so a terminal created later (or remounted) can show what came before.
+ */
+export class TermBus {
+  private buffers = new Map<string, string>();
+  private listeners = new Set<(tab: string, text: string, reset: boolean) => void>();
+
+  write(tab: string, text: string, reset = false) {
+    const cur = reset ? '' : this.buffers.get(tab) ?? '';
+    this.buffers.set(tab, (cur + text).slice(-TERM_KEEP));
+    this.listeners.forEach((l) => l(tab, text, reset));
+  }
+
+  read(tab: string) {
+    return this.buffers.get(tab) ?? '';
+  }
+
+  subscribe(fn: (tab: string, text: string, reset: boolean) => void) {
+    this.listeners.add(fn);
+    return () => void this.listeners.delete(fn);
+  }
+}
 
 function host(s: NetState, id: string | null, ip: string) {
   return id ? s.nodes.get(id)?.hostname ?? id : ip;
@@ -84,6 +110,7 @@ function matchTargets(s: NetState, e: MapEdge): number[] {
 export function useNetwork() {
   const [state, setState] = useState<NetState>(initial);
   const wsRef = useRef<WebSocket | null>(null);
+  const [term] = useState(() => new TermBus());
   const timers = useRef(new Set<ReturnType<typeof setTimeout>>());
 
   const later = useCallback((ms: number, fn: () => void) => {
@@ -120,16 +147,16 @@ export function useNetwork() {
             Object.assign(s, fresh, {
               connected: true,
               mode: msg.mode,
+              terminal: msg.terminal,
               level: msg.level,
               zones: msg.zones,
               nodes: new Map(msg.nodes.map((n) => [n.id, n])),
               edges: new Map(msg.edges.map((e) => [e.id, e])),
               targets: msg.targets,
               shells: msg.shells,
-              term: prev.term,
               tutor: prev.tutor.length
                 ? prev.tutor
-                : [{ id: 1, from: 'tutor', text: `**${msg.level.title}**\n\n${msg.level.brief}\n\nType \`help\` in the terminal to see what you can do. Hover any line on the map, or press "Explain this" on it, and I'll walk you through it.` }],
+                : [{ id: 1, from: 'tutor', text: `**${msg.level.title}**\n\n${msg.level.brief}\n\n${msg.terminal === 'pty' ? 'The terminal is a real bash shell on your laptop: anything you type runs for real.' : 'Type `help` in the terminal to see what you can do.'} Hover any line on the map, or press "Explain this" on it, and I'll walk you through it.` }],
             });
             msg.edges.forEach(achieve);
             break;
@@ -216,11 +243,8 @@ export function useNetwork() {
           case 'shells':
             s.shells = msg.shells;
             break;
-          case 'term': {
-            const cur = s.term[msg.tab] ?? '';
-            s.term = { ...s.term, [msg.tab]: msg.text === '\x1bclear' ? '' : cur + msg.text };
-            break;
-          }
+          case 'term':
+            break; // handled outside React state (see onMessage)
           case 'tutor':
             s.tutor = [...s.tutor, { id: Date.now(), from: 'tutor', text: msg.text }];
             break;
@@ -238,7 +262,12 @@ export function useNetwork() {
       const proto = location.protocol === 'https:' ? 'wss' : 'ws';
       const ws = new WebSocket(`${proto}://${location.host}/ws`);
       wsRef.current = ws;
-      ws.onmessage = (e) => apply(JSON.parse(e.data));
+      ws.onmessage = (e) => {
+        const msg = JSON.parse(e.data) as ServerMsg;
+        // The simulator's `clear` sends '\x1bclear'.
+        if (msg.type === 'term') term.write(msg.tab, msg.text === '\x1bclear' ? '' : msg.text, !!msg.replay || msg.text === '\x1bclear');
+        else apply(msg);
+      };
       ws.onclose = () => {
         setState((p) => ({ ...p, connected: false }));
         if (!stopped) retry = setTimeout(connect, 1500);
@@ -252,14 +281,10 @@ export function useNetwork() {
       pending.forEach(clearTimeout);
       wsRef.current?.close();
     };
-  }, [apply]);
+  }, [apply, term]);
 
   const send = useCallback((msg: ClientMsg) => {
     if (wsRef.current?.readyState === WebSocket.OPEN) wsRef.current.send(JSON.stringify(msg));
-  }, []);
-
-  const echo = useCallback((tab: string, prompt: string, line: string) => {
-    setState((p) => ({ ...p, term: { ...p.term, [tab]: (p.term[tab] ?? '') + prompt + line + '\n' } }));
   }, []);
 
   const askTutor = useCallback(
@@ -270,5 +295,5 @@ export function useNetwork() {
     [send],
   );
 
-  return { state, send, echo, askTutor };
+  return { state, send, term, askTutor };
 }

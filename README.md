@@ -93,7 +93,9 @@ The first run installs dependencies, builds the game and the Docker machines (a 
 Press **Ctrl+C** to stop the game. The Docker machines keep running until `netgame stop`.
 If Docker isn't usable, `netgame` says why, prints the fix, and starts the simulator instead.
 
-In the game, type `help` in the terminal panel to see what you can try.
+In Docker mode the terminal panel is a real bash shell on the `laptop` machine: interactive programs
+(`psql`, `top`, `vim`), Ctrl+C, tab completion and history all work. Copy and paste with Ctrl+Shift+C / Ctrl+Shift+V.
+In the simulator, type `help` in the terminal panel to see what you can try.
 
 ## Develop
 
@@ -114,6 +116,8 @@ npm test           # parser / correlator / command-log / simulator tests
 | `server/src/commandLog.ts` | Failed and one-shot connections from `ssh/curl/wget/nc/telnet/ping/psql/mysql/redis-cli` + output |
 | `server/src/mapState.ts` | Diffing, byte rate → dot speed, short-lived one-shot edges |
 | `server/src/sources/docker.ts` | Real mode: `docker inspect` + `docker exec <c> ss -tunapiH` every second |
+| `server/src/sources/dockerTerminal.ts` | Real mode terminal: interactive bash in the container over the Docker Engine API |
+| `server/src/shellTap.ts` | Reads the shell hook's markers: finished commands (→ command log) and prompts (→ ssh chain) |
 | `server/src/sources/sim.ts` | Simulator: fake machines that print real `ss` text and realistic tool output |
 | `server/src/tutor.ts` | Placeholder rule-based tutor; replace `explain()` with the real tutor |
 | `web/src/map/*` | The map: zones, cards, lines, port flags, tooltips, ghosts, goals, pan/zoom |
@@ -133,8 +137,10 @@ npm run docker:down    # remove containers and networks
   never for real servers.
 - Containers are found by the label `netgame.level=<level id>` (+ optional `netgame.kind`); container
   names must match the level's machine ids. Docker network `netgame-office` becomes zone `office`.
-- The terminal panel runs commands with `docker exec` (8 s limit, no PTY). `ssh host` keeps a real
-  background `ssh -N` open so the SSH line appears on the map, and the next commands run on `host`;
-  `exit` closes it. Interactive programs (e.g. plain `psql`) aren't supported, so use `psql … -c '…'`.
-- A real PTY terminal can replace it: send each finished command as
-  `{ type: 'cmd-log', machine, line, output, exitCode }` so failures and one-shot connections reach the map.
+- The terminal panel is a real `bash -l` with a TTY in the `laptop` container, opened through the Docker
+  Engine API (`server/src/sources/dockerTerminal.ts`) and drawn with xterm.js. All browsers share it.
+- `docker/machine/netgame-shell.sh` (sourced by every interactive bash) prints invisible OSC markers before
+  and after each command and at each prompt, with the hostname. They pass through `ssh`, so the server
+  (`server/src/shellTap.ts`) strips them and knows which command ran on which machine, its output and exit
+  code. That's how failed attempts and one-shot connections (curl, ping) reach the map.
+- `netgame` rebuilds the image by itself when `docker/machine/` is newer than it.

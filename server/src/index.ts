@@ -10,7 +10,7 @@ import type { ClientMsg, ServerMsg } from '../../shared/protocol.ts';
 import { Engine } from './engine.ts';
 import { loadLevel } from './level.ts';
 import { DockerSource } from './sources/docker.ts';
-import { DockerShell } from './sources/dockerShell.ts';
+import { DockerTerminals } from './sources/dockerTerminal.ts';
 import { SimSource } from './sources/sim.ts';
 
 const root = resolve(fileURLToPath(import.meta.url), '../../..');
@@ -27,10 +27,16 @@ const broadcast = (msg: ServerMsg) => clients.forEach((c) => send(c, msg));
 
 const engine = new Engine(level, source, broadcast);
 if (mode === 'docker') {
-  const shell = new DockerShell(level, (n) => engine.lookup(n), (c, s, p) => engine.findEdge(c, s, p));
-  engine.setShell(shell);
-  // Don't leave background ssh hops running after the server stops.
-  const stop = () => void shell.closeAll().finally(() => process.exit(0));
+  const terminals = new DockerTerminals(level, (c, s, p) => engine.findEdge(c, s, p), {
+    output: (tab, text) => broadcast({ type: 'term', tab, text }),
+    command: (cmd) => void engine.terminalActivity(cmd),
+    prompt: () => void engine.terminalActivity(),
+  });
+  engine.setTerminals(terminals);
+  const stop = () => {
+    terminals.closeAll();
+    process.exit(0);
+  };
   process.once('SIGINT', stop);
   process.once('SIGTERM', stop);
 }
@@ -58,6 +64,7 @@ const wss = new WebSocketServer({ server: http, path: '/ws' });
 wss.on('connection', (ws) => {
   clients.add(ws);
   send(ws, engine.snapshot());
+  engine.greet().forEach((m) => send(ws, m));
   ws.on('message', (data) => {
     let msg: ClientMsg;
     try {
