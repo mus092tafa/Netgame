@@ -1,5 +1,7 @@
+import { useState } from 'react';
 import type { MapNode, TargetConnection, Zone } from '../../../shared/protocol.ts';
 import { CATEGORY_LABEL } from '../../../shared/services.ts';
+import { Inline } from '../panels/Tutor.tsx';
 import type { ViewEdge } from '../useNetwork.ts';
 import type { LineItem } from './lines.tsx';
 
@@ -135,35 +137,76 @@ function goalSub(t: TargetConnection, name: (id: string) => string) {
   }
 }
 
-export function Objectives({ targets, achieved, name, onExplainCommand }: {
+/** The level's tasks: pick any one, read what it teaches, and get its command. */
+export function Tasks({ targets, achieved, selected, onSelect, chain, name, onExplainCommand, onTypeCommand, onReset }: {
   targets: TargetConnection[];
   achieved: Set<number>;
+  selected: number;
+  onSelect: (i: number) => void;
+  /** Where the terminal is: machines in its ssh chain, the current one last. */
+  chain: string[];
   name: (id: string) => string;
   onExplainCommand: (command: string) => void;
+  onTypeCommand: (command: string) => void;
+  onReset: () => void;
 }) {
+  const [open, setOpen] = useState(true);
   if (!targets.length) return null;
-  const next = targets.findIndex((_, i) => !achieved.has(i));
+  const t = targets[selected];
+  const done = achieved.has(selected);
+  const here = chain[chain.length - 1];
   return (
-    <div className="objectives panel-box" onPointerDown={(e) => e.stopPropagation()}>
+    <div className="tasks panel-box" onPointerDown={(e) => e.stopPropagation()}>
       <div className="box-title">
-        GOALS <span className="muted">{achieved.size}/{targets.length}</span>
+        TASKS <span className="muted">{achieved.size}/{targets.length} done</span>
+        <span className="tasks-nav">
+          <button disabled={selected <= 0} onClick={() => onSelect(selected - 1)} aria-label="Previous task">‹</button>
+          <button disabled={selected >= targets.length - 1} onClick={() => onSelect(selected + 1)} aria-label="Next task">›</button>
+          <button onClick={() => setOpen((o) => !o)} aria-label={open ? 'Collapse tasks' : 'Expand tasks'}>{open ? '–' : '+'}</button>
+        </span>
       </div>
-      {targets.map((t, i) => (
-        <div key={i} className={`goal ${achieved.has(i) ? 'done' : ''} ${i === next ? 'next' : ''}`}>
-          <span className="goal-box">{achieved.has(i) ? '✓' : ''}</span>
-          <span>
-            {t.label}
-            <span className="goal-sub">{goalSub(t, name)}</span>
-            {i === next && t.command && (
-              <span className="goal-cmd">
-                <span className="muted">on {name(t.from)}:</span> <code>{t.command}</code>
+      <div className="task-steps">
+        {targets.map((g, i) => (
+          <button
+            key={i}
+            className={`task-step ${achieved.has(i) ? 'done' : ''} ${i === selected ? 'on' : ''}`}
+            onClick={() => onSelect(i)}
+            title={`${i + 1}. ${g.label}${achieved.has(i) ? ' (done)' : ''}`}
+          >
+            {achieved.has(i) ? '✓' : i + 1}
+          </button>
+        ))}
+      </div>
+      {open && t && (
+        <div className="task-card">
+          <div className="task-title">
+            <span>Task {selected + 1} · {t.label}</span>
+            {done && <span className="task-done">✓ done</span>}
+          </div>
+          <span className="goal-sub">{goalSub(t, name)}</span>
+          {t.about && <p className="task-about"><Inline text={t.about} /></p>}
+          {t.command && (
+            <>
+              <div className="task-where">
+                Type it on <b>{name(t.from)}</b>
+                {here && t && here !== t.from && (
+                  <span className="task-warn">
+                    {' · '}
+                    <Inline text={`you are on ${name(here)} now: ${chain.includes(t.from) ? `\`exit\` back to ${name(t.from)}` : `\`ssh ${t.from}\` first`}`} />
+                  </span>
+                )}
+              </div>
+              <code className="task-cmd">{t.command}</code>
+              <div className="task-actions">
+                <button className="chip" onClick={() => onTypeCommand(t.command!)} title="Puts the command in the terminal. Press Enter to run it.">Type it</button>
                 <button className="chip" onClick={() => onExplainCommand(t.command!)}>What does it mean?</button>
-              </span>
-            )}
-          </span>
+              </div>
+            </>
+          )}
+          {achieved.size === targets.length && <div className="goal-sub">All tasks done. Replay any of them, or keep exploring: every command works.</div>}
+          {achieved.size > 0 && <button className="task-reset" onClick={onReset}>Reset progress</button>}
         </div>
-      ))}
-      {next < 0 && <div className="goal-sub">All goals reached. Keep exploring: every command works.</div>}
+      )}
     </div>
   );
 }

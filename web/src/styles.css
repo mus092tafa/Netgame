@@ -301,18 +301,29 @@ svg.lines { position: absolute; left: 0; top: 0; overflow: visible; pointer-even
 .swatch { width: 18px; height: 3px; border-radius: 2px; display: inline-block; }
 .swatch.dashed { height: 0; border-top: 2px dashed; background: none; }
 .swatch.dotted { height: 0; border-top: 2px dotted var(--ghost); background: none; }
-.objectives { right: 10px; top: 10px; max-width: 300px; max-height: calc(100% - 70px); overflow: auto; }
-.goal { display: flex; gap: 8px; align-items: flex-start; margin: 5px 0; font-size: 11.5px; }
-.goal.done { color: var(--c-ssh); }
-.goal-box { width: 14px; height: 14px; border: 1.5px solid var(--line-2); border-radius: 3px; display: grid; place-items: center; flex: none; font-size: 10px; }
-.goal.done .goal-box { border-color: var(--c-ssh); background: color-mix(in srgb, var(--c-ssh) 20%, transparent); }
+.tasks { right: 10px; top: 10px; width: 320px; max-width: calc(100% - 20px); max-height: calc(100% - 70px); overflow: auto; }
+.tasks-nav { margin-left: auto; display: flex; gap: 4px; }
+.tasks-nav button { background: var(--panel-2); border: 1px solid var(--line); border-radius: 3px; width: 22px; height: 20px; line-height: 1; padding: 0; color: var(--text); }
+.tasks-nav button:hover:not(:disabled) { border-color: var(--accent); }
+.tasks-nav button:disabled { opacity: 0.35; cursor: default; }
+.task-steps { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 8px; }
+.task-step { width: 24px; height: 24px; border-radius: 50%; border: 1.5px solid var(--line-2); background: transparent; color: var(--muted); font-size: 11px; font-weight: 700; padding: 0; }
+.task-step:hover { border-color: var(--accent); color: var(--text); }
+.task-step.done { border-color: var(--c-ssh); color: var(--c-ssh); background: color-mix(in srgb, var(--c-ssh) 15%, transparent); }
+.task-step.on { border-color: var(--accent); color: var(--text); box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 35%, transparent); }
 .goal-sub { display: block; color: var(--muted); font-size: 10.5px; }
-.goal.next { color: var(--text); font-weight: 700; }
-.goal.next .goal-box { border-color: var(--accent); }
-.goal-cmd { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; margin-top: 4px; font-weight: 400; }
-.goal-cmd code { color: var(--accent); }
-.goal-cmd .chip { margin-left: auto; }
 .msg ul { margin: 0 0 6px; padding-left: 16px; } .msg li { margin: 2px 0; }
+.task-card { border-top: 1px solid var(--line); padding-top: 8px; }
+.task-title { display: flex; gap: 8px; align-items: baseline; font-size: 12px; font-weight: 700; color: var(--text); }
+.task-done { margin-left: auto; color: var(--c-ssh); font-size: 10.5px; white-space: nowrap; }
+.task-about { margin: 6px 0; font-size: 11.5px; line-height: 1.5; }
+.task-where { margin-top: 6px; color: var(--muted); }
+.task-where b { color: var(--text); }
+.task-warn { color: var(--c-dns); }
+.task-cmd { display: block; margin: 4px 0; padding: 5px 8px; background: var(--bg); border: 1px solid var(--line); border-radius: 3px; color: var(--accent); font-size: 12px; white-space: pre-wrap; }
+.task-actions { display: flex; gap: 6px; }
+.task-reset { display: block; margin: 8px 0 0 auto; background: none; border: 0; padding: 0; color: var(--muted); font-size: 10.5px; text-decoration: underline; }
+.task-reset:hover { color: var(--text); }
 .details { right: 10px; bottom: 52px; width: 300px; max-height: calc(100% - 62px); overflow: auto; font-size: 11.5px; }
 .details .x { margin-left: auto; background: none; border: 0; font-size: 18px; line-height: 1; color: var(--muted); }
 .dl { display: grid; grid-template-columns: 64px 1fr; gap: 2px 8px; }

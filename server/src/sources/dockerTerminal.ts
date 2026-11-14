@@ -14,6 +14,21 @@ import { ShellTap, type FinishedCommand } from '../shellTap.ts';
 
 const SCROLLBACK = 256 * 1024;
 const RETRY_MS = 3000;
+/**
+ * argv[0] of the shells we start. Docker doesn't end an exec when its client goes away, so the
+ * server kills these itself on shutdown (and at start, in case it crashed). Otherwise old shells
+ * keep their ssh/psql connections open and the map shows connections nobody is using.
+ */
+const SHELL_NAME = 'netgame-shell';
+
+/** Ends our shells in a container; bash passes the hangup on to what runs in it (ssh, psql…). */
+function killShells(container: string) {
+  try {
+    execFileSync('docker', ['exec', '-u', 'root', container, 'pkill', '-HUP', '-f', `^${SHELL_NAME}`], { stdio: 'ignore', timeout: 5000 });
+  } catch {
+    /* none running, or the container is down */
+  }
+}
 
 /** Where the Docker daemon listens: $DOCKER_HOST, else the current `docker context`. */
 function dockerEndpoint(): Pick<RequestOptions, 'socketPath' | 'host' | 'port'> {
@@ -111,6 +126,8 @@ export interface DockerTerminalEvents {
 export class DockerTerminals {
   private endpoint = dockerEndpoint();
   private sessions = new Map<string, Session>();
+  /** Leftover shells from an earlier run are killed once, before opening the first one. */
+  private cleaned = false;
 
   constructor(
     level: Level,
@@ -149,6 +166,10 @@ export class DockerTerminals {
 
   /** Opens the shells that aren't open yet. Called when a browser connects. */
   ensure() {
+    if (!this.cleaned) {
+      this.cleaned = true;
+      for (const s of this.sessions.values()) killShells(s.root);
+    }
     for (const s of this.sessions.values()) void this.open(s);
   }
 
@@ -171,6 +192,7 @@ export class DockerTerminals {
     for (const s of this.sessions.values()) {
       s.closed = true;
       s.socket?.destroy();
+      killShells(s.root);
     }
   }
 
@@ -205,7 +227,7 @@ export class DockerTerminals {
         AttachStdin: true, AttachStdout: true, AttachStderr: true, Tty: true,
         User: s.user, WorkingDir: s.user === 'root' ? '/root' : `/home/${s.user}`,
         Env: ['TERM=xterm-256color', 'LANG=C.UTF-8'],
-        Cmd: ['bash', '-l'],
+        Cmd: ['bash', '-c', `exec -a ${SHELL_NAME} bash -l`],
       });
       const socket = await attach(this.endpoint, exec.Id, s.cols, s.rows);
       s.execId = exec.Id;

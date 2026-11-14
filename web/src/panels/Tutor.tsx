@@ -1,7 +1,8 @@
 import { Fragment, useEffect, useRef } from 'react';
 import type { TutorMsg } from '../useNetwork.ts';
 
-function Inline({ text }: { text: string }) {
+/** **bold**, `code` and *italic* inside one line. */
+export function Inline({ text }: { text: string }) {
   return (
     <>
       {text.split(/(\*\*[^*]+\*\*|`[^`]+`|\*[^*]+\*)/).map((part, j) => {

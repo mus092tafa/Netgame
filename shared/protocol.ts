@@ -90,8 +90,10 @@ export interface TargetConnection {
    */
   kind?: 'connect' | 'ping' | 'refused' | 'timeout';
   label: string;
-  /** A command that does it, typed on `from`. The goals panel can explain each part of it. */
+  /** A command that does it, typed on `from`. The tasks panel can explain each part of it. */
   command?: string;
+  /** What the task is about and what to watch for (tutor markdown: `code`, *italic*). */
+  about?: string;
 }
 
 /** Terminal tab (a shell rooted on one machine, possibly hopped elsewhere through ssh). */

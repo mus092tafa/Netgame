@@ -41,6 +41,8 @@ export function buildLines(
   achieved: Set<number>,
   justAchieved: Set<number>,
   shell: ShellInfo | undefined,
+  /** The task picked in the tasks panel (-1: none). */
+  focus: number,
 ): LineItem[] {
   const items: LineItem[] = [];
   const chainEdges = new Set(shell?.hopEdges.filter(Boolean) as string[]);
@@ -64,10 +66,9 @@ export function buildLines(
     });
   }
 
-  // Only the next goal is drawn (plus one just reached, for its burst), so the map doesn't fill up with dotted lines.
-  const next = targets.findIndex((_, i) => !achieved.has(i));
+  // Only the picked task is drawn (plus one just reached, for its burst), so the map doesn't fill up with dotted lines.
   targets.forEach((t, i) => {
-    if (i !== next && !justAchieved.has(i)) return;
+    if (i !== focus && !justAchieved.has(i)) return;
     if (liveGoal.has(i)) return; // the real line is drawn instead
     const svc = lookupService(t.port ?? 0);
     const kind = t.kind ?? 'connect';

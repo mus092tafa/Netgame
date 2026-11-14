@@ -44,11 +44,42 @@ function Splitter({ dir, onDrag }: { dir: 'col' | 'row'; onDrag: (delta: number)
 }
 
 export function App() {
-  const { state, send, term, askTutor, tutorSay } = useNetwork();
+  const { state, send, term, askTutor, tutorSay, resetProgress } = useNetwork();
   const [theme, setTheme] = useState<'dark' | 'light'>(() => readPref('netgame.theme', 'dark'));
   const [sizes, setSizes] = useState(() => readPref('netgame.panels', { side: 440, tutor: 260, log: 190 }));
   const [activeTab, setActiveTab] = useState<string | null>(null);
   const [start] = useState(Date.now());
+  // Lets the tasks panel type into the terminal: tab → (command, press Enter?).
+  const terminals = useRef(new Map<string, (cmd: string, enter: boolean) => void>()).current;
+
+  // The task picked in the tasks panel, remembered per level. Starts at the first one not done yet.
+  const levelId = state.level?.id;
+  const [picked, setPicked] = useState<number | null>(null);
+  const pick = useCallback(
+    (i: number) => {
+      setPicked(i);
+      if (levelId) writePref(`netgame.task.${levelId}`, i);
+    },
+    [levelId],
+  );
+  const firstOpen = Math.max(0, state.targets.findIndex((_, i) => !state.achieved.has(i)));
+  const task = picked != null && picked < state.targets.length ? picked : firstOpen;
+  // Pinned once the level is known, so finishing a task shows its ✓ before moving on (below).
+  const ready = !!levelId && state.targets.length > 0;
+  useEffect(() => {
+    if (ready) setPicked(readPref<number | null>(`netgame.task.${levelId}`, null) ?? firstOpen);
+    // Only when the level changes: picking a task later must not be overridden.
+  }, [ready, levelId]);
+
+  // Finishing the picked task moves on to the next one not done yet (after its ✓ shows for a moment).
+  useEffect(() => {
+    if (!state.justAchieved.has(task)) return;
+    const n = state.targets.length;
+    const next = [...Array(n).keys()].map((k) => (task + 1 + k) % n).find((i) => !state.achieved.has(i));
+    if (next == null) return;
+    const t = setTimeout(() => pick(next), 1500);
+    return () => clearTimeout(t);
+  }, [state.justAchieved, state.achieved, state.targets.length, task, pick]);
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
@@ -99,6 +130,16 @@ export function App() {
               const help = explainCommand(cmd);
               if (help) tutorSay(`What does \`${cmd}\` mean?`, formatCommandHelp(cmd, help));
             }}
+            onTypeCommand={(cmd) => {
+              const tab = activeTab ?? state.shells[0]?.tab;
+              if (tab) terminals.get(tab)?.(cmd, false);
+            }}
+            task={task}
+            onTask={pick}
+            onResetProgress={() => {
+              resetProgress();
+              pick(0);
+            }}
           />
           <Splitter dir="row" onDrag={(d) => resize('log', -d, 60, 500)} />
           <ConnectionLog rows={state.log} start={start} />
@@ -113,6 +154,7 @@ export function App() {
             bus={term}
             theme={theme}
             send={send}
+            runners={terminals}
           />
           <Splitter dir="row" onDrag={(d) => resize('tutor', -d, 80, 700)} />
           <Tutor messages={state.tutor} />

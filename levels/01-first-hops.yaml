@@ -3,8 +3,8 @@ title: First hops
 brief: >
   Your laptop is on the office network. The database lives on a separate backend network
   that your laptop can't reach directly. web-01 sits in both networks.
-  Work through the goals in the top right of the map: the next one is drawn as a dotted line.
-  Each goal shows a command that does it. Press "What does it mean?" to see what every part of the command is for.
+  Pick a task in the TASKS box on the map (top right); the one you picked is drawn as a dotted line.
+  Each task shows a command that does it. Press "What does it mean?" to see what every part of the command is for.
 
 networks:
   - id: office
@@ -47,42 +47,49 @@ machines:
       - { name: sshd, port: 22 }
       - { name: postgres, port: 5432 }
 
-# Goals, in the order the panel suggests them. kind: connect (default) | ping | refused | timeout
+# Tasks, in order. kind: connect (default) | ping | refused | timeout. `about` is what the task teaches.
 target_connections:
   - from: laptop
     to: web-01
     kind: ping
     label: "Check that web-01 is reachable"
     command: ping -c 2 web-01
+    about: "Before anything else, check that web-01 answers at all. Ping uses ICMP, which works below ports: it only asks \"are you there?\". A reply proves the machine is reachable, not that any service runs on it."
   - from: laptop
     to: web-01
     port: 80
     label: "Fetch web-01's home page"
     command: curl http://web-01/
+    about: "web-01 runs a web server (nginx) on port 80. curl opens a connection, asks for the home page, gets it and closes, so its line on the map only flashes."
   - from: laptop
     to: web-01
     port: 8080
     kind: refused
     label: "Knock on a port where nothing listens"
     command: curl http://web-01:8080/
+    about: "Ask for a port where no program is listening. The machine is up, so it answers right away with \"refused\": nobody is home on that port. Watch for the ✖ on the map."
   - from: laptop
     to: web-01
     port: 443
     kind: timeout
     label: "Find the port web-01's firewall blocks"
     command: curl -m 3 https://web-01/
+    about: "HTTPS uses port 443, and web-01's firewall silently drops those packets. Unlike \"refused\", nothing answers at all, so curl waits. `-m 3` makes it give up after 3 seconds. Watch for the 🧱 on the map."
   - from: laptop
     to: web-01
     port: 22
     label: "SSH into web-01"
     command: ssh web-01
+    about: "SSH gives you a shell on web-01. After it, your prompt says `dev@web-01` and every command runs there. The line stays on the map until you type `exit`."
   - from: web-01
     to: db-01
     port: 5432
     label: "Connect to the database from web-01"
     command: psql -h db-01 -U app
+    about: "The database db-01 sits on the backend network, which your laptop can't reach. web-01 is on both networks, so run this *on web-01* (do the SSH task first). Type `\\q` to leave psql."
   - from: web-01
     to: db-01
     port: 22
     label: "Hop on from web-01 to db-01"
     command: ssh db-01
+    about: "Hop once more: from web-01, open a shell on db-01. The terminal tab shows the chain laptop → web-01 → db-01. Each `exit` takes you back one step."

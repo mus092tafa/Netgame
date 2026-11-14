@@ -20,6 +20,8 @@ interface Props {
   bus: TermBus;
   theme: 'dark' | 'light';
   send: (msg: ClientMsg) => void;
+  /** Filled in here, used by the chips and the tasks panel: type a command into a tab, with or without Enter. */
+  runners: Map<string, (cmd: string, enter: boolean) => void>;
 }
 
 /** xterm can't read CSS variables, so the colors are copied from the current theme. */
@@ -65,10 +67,10 @@ class LineEditor {
     this.showPrompt();
   }
 
-  run(line: string) {
+  run(line: string, enter = true) {
     if (this.waiting) return;
     this.replace(line);
-    this.enter();
+    if (enter) this.enter();
   }
 
   key(data: string) {
@@ -137,8 +139,7 @@ interface ViewProps {
   theme: Props['theme'];
   visible: boolean;
   send: Props['send'];
-  /** Lets the suggestion chips type into this terminal. */
-  runners: Map<string, (cmd: string) => void>;
+  runners: Props['runners'];
 }
 
 function TermView({ shell, mode, bus, theme, visible, send, runners }: ViewProps) {
@@ -199,10 +200,10 @@ function TermView({ shell, mode, bus, theme, visible, send, runners }: ViewProps
     const size = term.onResize(({ cols, rows }) => {
       if (mode === 'pty') send({ type: 'term-resize', tab, cols, rows });
     });
-    runners.set(tab, (cmd) => {
+    runners.set(tab, (cmd, enter) => {
       term.focus();
-      if (editor) editor.run(cmd);
-      else send({ type: 'term-input', tab, data: `${cmd}\r` });
+      if (editor) editor.run(cmd, enter);
+      else send({ type: 'term-input', tab, data: enter ? `${cmd}\r` : cmd });
     });
 
     const observer = new ResizeObserver(() => {
@@ -242,8 +243,7 @@ function TermView({ shell, mode, bus, theme, visible, send, runners }: ViewProps
   return <div className="term-body" ref={host} style={visible ? undefined : { display: 'none' }} />;
 }
 
-export function Terminal({ shells, active, onActive, mode, bus, theme, send }: Props) {
-  const runners = useRef(new Map<string, (cmd: string) => void>()).current;
+export function Terminal({ shells, active, onActive, mode, bus, theme, send, runners }: Props) {
   const shell = shells.find((s) => s.tab === active) ?? shells[0];
 
   if (mode && !shells.length) {
@@ -274,7 +274,7 @@ export function Terminal({ shells, active, onActive, mode, bus, theme, send }: P
         ))}
       <div className="chips">
         {(mode === 'line' ? ['help', ...SUGGESTIONS] : SUGGESTIONS).map((c) => (
-          <button key={c} className="chip" onClick={() => shell && runners.get(shell.tab)?.(c)}>
+          <button key={c} className="chip" onClick={() => shell && runners.get(shell.tab)?.(c, true)}>
             {c}
           </button>
         ))}

@@ -73,6 +73,23 @@ const initial = (): NetState => ({
 let rowSeq = 0;
 let tutorSeq = 1;
 
+/** Finished tasks are remembered per level in this browser. */
+const doneKey = (level: string) => `netgame.done.${level}`;
+function loadDone(level: string): Set<number> {
+  try {
+    return new Set(JSON.parse(localStorage.getItem(doneKey(level)) ?? '[]') as number[]);
+  } catch {
+    return new Set();
+  }
+}
+function saveDone(level: string, done: Set<number>) {
+  try {
+    localStorage.setItem(doneKey(level), JSON.stringify([...done]));
+  } catch {
+    /* private window: progress just isn't kept */
+  }
+}
+
 const TERM_KEEP = 256 * 1024;
 
 /**
@@ -128,6 +145,7 @@ export function useNetwork() {
           const hits = goals.filter((i) => !s.achieved.has(i));
           if (!hits.length) return;
           s.achieved = new Set([...s.achieved, ...hits]);
+          if (s.level) saveDone(s.level.id, s.achieved);
           s.justAchieved = new Set([...s.justAchieved, ...hits]);
           later(1600, () => setState((p) => {
             const j = new Set(p.justAchieved);
@@ -149,6 +167,7 @@ export function useNetwork() {
               nodes: new Map(msg.nodes.map((n) => [n.id, n])),
               edges: new Map(msg.edges.map((e) => [e.id, e])),
               targets: msg.targets,
+              achieved: new Set([...loadDone(msg.level.id)].filter((i) => i < msg.targets.length)),
               shells: msg.shells,
               tutor: prev.tutor.length
                 ? prev.tutor
@@ -301,5 +320,12 @@ export function useNetwork() {
     }));
   }, []);
 
-  return { state, send, term, askTutor, tutorSay };
+  const resetProgress = useCallback(() => {
+    setState((p) => {
+      if (p.level) saveDone(p.level.id, new Set());
+      return { ...p, achieved: new Set(), justAchieved: new Set() };
+    });
+  }, []);
+
+  return { state, send, term, askTutor, tutorSay, resetProgress };
 }

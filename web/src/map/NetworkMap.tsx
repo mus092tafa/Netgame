@@ -4,7 +4,7 @@ import type { NetState, ViewEdge } from '../useNetwork.ts';
 import { autoLayout, bounds, CARD_W, DEFAULT_H, zoneHue, zoneRects, type Pt, type Rect, type Size } from './layout.ts';
 import { buildLines, ghostId, layoutLines, LineLabel, LineSvg, type LineItem } from './lines.tsx';
 import { NodeCard } from './NodeCard.tsx';
-import { DetailsPanel, Legend, Objectives, Tooltip } from './overlays.tsx';
+import { DetailsPanel, Legend, Tasks, Tooltip } from './overlays.tsx';
 
 interface Props {
   state: NetState;
@@ -14,6 +14,10 @@ interface Props {
   onFocusMachine: (id: string) => void;
   onExplain: (question: string, payload: { edge?: MapEdge; event?: MapEvent }) => void;
   onExplainCommand: (command: string) => void;
+  onTypeCommand: (command: string) => void;
+  task: number;
+  onTask: (i: number) => void;
+  onResetProgress: () => void;
 }
 
 const GHOST: Size = { w: 120, h: 64 };
@@ -38,7 +42,9 @@ type Drag =
   | { kind: 'pan'; sx: number; sy: number; vx: number; vy: number }
   | { kind: 'node'; id: string; sx: number; sy: number; nx: number; ny: number; moved: boolean };
 
-export function NetworkMap({ state, activeTab, theme, onToggleTheme, onFocusMachine, onExplain, onExplainCommand }: Props) {
+export function NetworkMap({
+  state, activeTab, theme, onToggleTheme, onFocusMachine, onExplain, onExplainCommand, onTypeCommand, task, onTask, onResetProgress,
+}: Props) {
   const levelId = state.level?.id ?? 'none';
   const nodes = useMemo(() => [...state.nodes.values()], [state.nodes]);
   const [saved, setSaved] = useState<Record<string, Pt>>({});
@@ -103,8 +109,8 @@ export function NetworkMap({ state, activeTab, theme, onToggleTheme, onFocusMach
   const posOf = useCallback((id: string) => pos[id] ?? ghosts.find((g) => g.id === id)?.at, [pos, ghosts]);
 
   const items = useMemo(
-    () => buildLines(state.edges, state.transients, state.targets, state.achieved, state.justAchieved, activeShell),
-    [state.edges, state.transients, state.targets, state.achieved, state.justAchieved, activeShell],
+    () => buildLines(state.edges, state.transients, state.targets, state.achieved, state.justAchieved, activeShell, task),
+    [state.edges, state.transients, state.targets, state.achieved, state.justAchieved, activeShell, task],
   );
   const geo = useMemo(() => layoutLines(items, posOf, sizeOf), [items, posOf, sizeOf]);
 
@@ -344,7 +350,17 @@ export function NetworkMap({ state, activeTab, theme, onToggleTheme, onFocusMach
         )}
 
         <Legend />
-        <Objectives targets={state.targets} achieved={state.achieved} name={(id) => name(id)} onExplainCommand={onExplainCommand} />
+        <Tasks
+          targets={state.targets}
+          achieved={state.achieved}
+          selected={task}
+          onSelect={onTask}
+          chain={activeShell?.chain ?? []}
+          name={(id) => name(id)}
+          onExplainCommand={onExplainCommand}
+          onTypeCommand={onTypeCommand}
+          onReset={onResetProgress}
+        />
         {selNode && (
           <DetailsPanel
             node={selNode}
